@@ -1,103 +1,104 @@
-import Image from "next/image";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import prisma from "@/lib/db";
+import { redirect } from "next/navigation";
+import NotesGrid from "@/components/notes-grid";
+import { fmtDateStr, fmtTimeStr } from "@/lib/utils";
 
-export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+const PAGE_SIZE = 10;
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
-  );
+export default async function Home() {
+  const session = await getServerSession(authOptions);
+  const uid = (session?.user as any)?.id;
+  if (!uid) redirect("/login");
+
+  const rows = await prisma.note.findMany({
+    where: {
+      OR: [{ ownerId: uid }, { collaborators: { some: { userId: uid } } }],
+    },
+    orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+    take: PAGE_SIZE + 1,
+    select: {
+      id: true,
+      title: true,
+      content: true,
+      color: true,
+      updatedAt: true,
+      ownerId: true,
+      isPublic: true,
+      publicLink: { select: { slug: true } },
+      collaborators: {
+        select: {
+          userId: true,
+          role: true,
+          user: { select: { id: true, email: true, name: true } },
+        },
+      },
+      _count: { select: { comments: true } },
+    },
+  });
+
+  const hasMore = rows.length > PAGE_SIZE;
+  const slice = hasMore ? rows.slice(0, PAGE_SIZE) : rows;
+
+  const data = slice.map((n) => {
+    const myCollab = n.collaborators.find((c) => c.userId === uid);
+    const firstOtherCollab = n.collaborators.find((c) => c.userId !== uid);
+
+    const role = (n.ownerId === uid
+      ? "owner"
+      : (myCollab?.role ?? "viewer")) as "owner" | "editor" | "viewer";
+
+    const initialShareMode =
+      (role === "owner"
+        ? (n.isPublic ? "public" : firstOtherCollab ? "team" : "private")
+        : "team") as "public" | "team" | "private";
+
+    return {
+      id: n.id,
+      title: n.title,
+      content: n.content,
+      color: n.color ?? "bg-yellow-200",
+      dateLabel: fmtDateStr(n.updatedAt),
+      timeLabel: fmtTimeStr(n.updatedAt),
+
+      role,
+      isPublic: n.isPublic && role === "owner",
+      publicSlug: role === "owner" ? (n.publicLink?.slug ?? null) : null,
+
+      initialShareMode,
+      initialTeam: firstOtherCollab
+        ? {
+            id: firstOtherCollab.user.id,
+            email: firstOtherCollab.user.email,
+            name: firstOtherCollab.user.name ?? null,
+          }
+        : null,
+
+      slug: role === "owner" ? (n.publicLink?.slug ?? null) : null,
+      commentsCount: n._count.comments,
+
+      collaborators: n.collaborators.map((c) => ({
+        role: c.role as "owner" | "editor" | "viewer",
+        user: {
+          id: c.user.id,
+          email: c.user.email,
+          name: c.user.name ?? null,
+        },
+      })),
+      // sisipkan cursor internal utk hitung nextCursor:
+      _cursor: { updatedAt: n.updatedAt.toISOString(), id: n.id },
+    };
+  });
+
+  const initialCursor = hasMore
+    ? {
+        updatedAt: data[data.length - 1]._cursor.updatedAt,
+        id: data[data.length - 1]._cursor.id,
+      }
+    : null;
+
+  const initialNotes = data.map(({ _cursor, ...rest }) => rest);
+
+  return <NotesGrid initialNotes={initialNotes} initialCursor={initialCursor} />;
 }
