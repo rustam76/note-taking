@@ -1,4 +1,4 @@
-  # Note Taking Application
+# Note Taking Application
 
 ## Project Structure
 
@@ -39,6 +39,92 @@ The project follows a modern Next.js application structure with a clear separati
   - `users.ts`: User-related API calls
 
 - **`/types`**: TypeScript type definitions
+
+## Cara Mengkloning dan Menjalankan Aplikasi
+
+### Prasyarat
+
+- Node.js (versi 18 atau lebih baru)
+- npm atau yarn
+- PostgreSQL (versi 14 atau lebih baru)
+
+### Langkah-langkah Instalasi
+
+1. **Kloning repositori**
+
+   ```bash
+   git clone https://github.com/username/note-taking-app.git
+   cd note-taking-app
+   ```
+
+2. **Instal dependensi**
+
+   ```bash
+   npm install
+   # atau
+   yarn install
+   ```
+
+3. **Konfigurasi database**
+
+   Buat file `.env` di root proyek dengan konten berikut:
+
+   ```
+   DATABASE_URL="postgresql://username:password@localhost:5432/note_taking_db"
+   NEXTAUTH_SECRET="your-secret-key"
+   NEXTAUTH_URL="http://localhost:3000"
+   ```
+
+   Ganti `username`, `password`, dan nama database sesuai dengan konfigurasi PostgreSQL Anda.
+
+4. **Jalankan migrasi database**
+
+   ```bash
+   npm run migrate
+   # atau
+   yarn migrate
+   ```
+
+5. **Isi database dengan data awal (opsional)**
+
+   ```bash
+   npm run seed
+   # atau
+   yarn seed
+   ```
+
+   Ini akan membuat beberapa pengguna demo dengan password `password123`:
+   - Email: abdul@gmail.com (user utama)
+   - Email: siti@gmail.com, budi@gmail.com, dll.
+
+### Menjalankan Aplikasi
+
+1. **Mode pengembangan**
+
+   ```bash
+   npm run dev
+   # atau
+   yarn dev
+   ```
+
+   Aplikasi akan berjalan di [http://localhost:3000](http://localhost:3000)
+
+2. **Mode produksi**
+
+   ```bash
+   npm run build
+   npm run start
+   # atau
+   yarn build
+   yarn start
+   ```
+
+### Mengakses Aplikasi
+
+1. Buka browser dan kunjungi [http://localhost:3000](http://localhost:3000)
+2. Login menggunakan salah satu akun demo (jika menggunakan data seed)
+   - Email: abdul@gmail.com
+   - Password: password123
 
 ## Database Structure & Design Rationale
 
