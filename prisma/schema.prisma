@@ -1,4 +1,3 @@
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -8,43 +7,35 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum NoteRole {
-  owner
-  editor
-  viewer
-
-  @@map("note_role")
-}
-
 model User {
-  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  email        String     @unique
-  name         String?
-  passwordHash String?    @map("password_hash")
-  image        String?
-  notes        Note[]     @relation("UserNotes")
-  comments     Comment[]
+  id             String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email          String             @unique
+  name           String?
+  passwordHash   String?            @map("password_hash")
+  image          String?
+  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+  comments       Comment[]
   collaborations NoteCollaborator[]
-  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+  notes          Note[]             @relation("UserNotes")
 
   @@map("users")
 }
 
 model Note {
-  id            String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  ownerId       String              @map("owner_id") @db.Uuid
-  owner         User                @relation("UserNotes", fields: [ownerId], references: [id], onDelete: Cascade)
+  id            String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId       String             @map("owner_id") @db.Uuid
   title         String
   content       String
-  isPublic      Boolean             @default(false) @map("is_public")
-  updatedBy     String?             @map("updated_by") @db.Uuid
+  isPublic      Boolean            @default(false) @map("is_public")
+  updatedBy     String?            @map("updated_by") @db.Uuid
   color         String?
+  createdAt     DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+  comments      Comment[]
   collaborators NoteCollaborator[]
   publicLink    NotePublicLink?
-  comments      Comment[]
-  createdAt     DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt     DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+  owner         User               @relation("UserNotes", fields: [ownerId], references: [id], onDelete: Cascade)
 
   @@index([ownerId], map: "idx_notes_owner")
   @@index([isPublic], map: "idx_notes_public")
@@ -53,11 +44,11 @@ model Note {
 
 model NoteCollaborator {
   noteId  String   @map("note_id") @db.Uuid
-  note    Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
   userId  String   @map("user_id") @db.Uuid
-  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   role    NoteRole
   addedAt DateTime @default(now()) @map("added_at") @db.Timestamptz(6)
+  note    Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([noteId, userId])
   @@map("note_collaborators")
@@ -65,9 +56,9 @@ model NoteCollaborator {
 
 model NotePublicLink {
   noteId    String   @id @map("note_id") @db.Uuid
-  note      Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
   slug      String   @unique
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  note      Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
 
   @@map("note_public_links")
 }
@@ -75,16 +66,24 @@ model NotePublicLink {
 model Comment {
   id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   noteId    String    @map("note_id") @db.Uuid
-  note      Note      @relation(fields: [noteId], references: [id], onDelete: Cascade)
   authorId  String    @map("author_id") @db.Uuid
-  author    User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
   parentId  String?   @map("parent_id") @db.Uuid
-  parent    Comment?  @relation("Thread", fields: [parentId], references: [id], onDelete: Cascade)
-  children  Comment[] @relation("Thread")
   body      String
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  author    User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  note      Note      @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  parent    Comment?  @relation("Thread", fields: [parentId], references: [id], onDelete: Cascade)
+  children  Comment[] @relation("Thread")
 
   @@index([noteId], map: "idx_comments_note")
   @@map("comments")
+}
+
+enum NoteRole {
+  owner
+  editor
+  viewer
+
+  @@map("note_role")
 }
